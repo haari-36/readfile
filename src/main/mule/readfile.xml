@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="5d9bea14-ffd6-4d11-86f9-6312fef8d363" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<file:config name="File_Config" doc:name="File Config" doc:id="7ca911fc-5b94-4300-b9a7-19e79bbf8269" >
+		<file:connection workingDir="D:\New folder" />
+	</file:config>
+	<flow name="readfile" doc:id="38d44065-2f7b-43c7-b4c0-01f6741dcadf" >
+		<http:listener doc:name="http listener" doc:id="b20391d3-3d95-4b92-8c88-2db2f405dccd" config-ref="HTTP_Listener_config" path="/file" allowedMethods="POST"/>
+		<set-variable value="#[payload.directoryPath]" doc:name="Set directoryPath" doc:id="ce6e2684-5cd9-4230-9a24-c27270abb88c" variableName="directoryPath"/>
+		<file:list doc:name="List all files from directory path" doc:id="b0ba7722-2727-4642-a57c-46a846ac8d6c" directoryPath="#[payload.directoryPath]" config-ref="File_Config"/>
+		<logger level="INFO" doc:name="Logger" doc:id="78ff49f3-7569-4652-9780-26281dc98a42" message="#[payload]"/>
+		<set-variable value="#[payload[0].attributes.fileName]" doc:name="set fileName" doc:id="29dd86e1-0d74-4397-9adc-498dba91022a" variableName="fileName"/>
+		<file:read doc:name="file Read" doc:id="8640c071-e0a1-4869-96c4-6349555a6b85" path="#[vars.directoryPath ++ '/' ++ vars.fileName]" outputMimeType="application/xlsx"/>
+		<ee:transform doc:name="Read the Contents" doc:id="fe0b6657-1744-489a-92a6-b12debad3df8">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json	
+input payload application/xlsx
+---
+  payload.Sheet1 map {
+
+  'collegename' : $.collegename,
+
+  'branch' : $.branch
+
+
+}
+
+]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+		
+						<ee:transform doc:name="Set the Contents" doc:id="66032292-ca9f-4c0f-b59d-543a2768fb3d">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	
+	"branch" : payload
+	
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+		<logger level="INFO" doc:name="file readsuccess" doc:id="6d95eb5e-a69f-4580-831c-dab5508dc507" message='#["file readsuccess"]'/>
+		<file:move doc:name="Move files to Archive" doc:id="f2248ec0-17cf-48e9-8079-9bba78afaca9" sourcePath="#[vars.directoryPath ++ '/' ++ vars.fileName]" targetPath="#[vars.directoryPath ++ '/output']" overwrite="true" >
+							<reconnect />
+						</file:move>
+	</flow>
+</mule>
